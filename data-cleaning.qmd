@@ -1,0 +1,72 @@
+---
+title: Data Cleaning
+format: typst
+---
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(stringr)
+a<- read_excel("data/g24-results-by-district.xlsx")
+a_clean <- a |> 
+  mutate(across(everything(), ~str_replace_all(.x, "\\r\\n", " "))) |>
+  filter(!(is.na(`...2`) & is.na(`...3`))) |> 
+  filter(!str_detect(`1st Congressional District`, "Congressional District")) |> 
+  filter(!str_detect(`1st Congressional District`, "Percent|Totals")) |> 
+  filter(!(`1st Congressional District` %in% c("DEM", "REP")))
+clean_long <- a_clean |> 
+  mutate(county = `1st Congressional District`,party = `...2`,votes = suppressWarnings(as.numeric(`...3`))) |>
+  filter(party %in% c("DEM", "REP")) |> 
+  select(county, party, votes)
+final_votes <- clean_long |>
+  pivot_wider(names_from = party,values_from = votes)
+print(final_votes)
+
+```
+
+
+
+```{r}
+library(sf)
+library(tidyverse)
+
+VOTE_DATA_PATH <- "data/state_g24_sov_data_by_g24_srprec.csv" 
+SR_SHAPEFILE_PATH <- "data/srprec_state_g24_v01_shp (1)/srprec_state_g24_v01_shp.shp" 
+AB604_SHAPEFILE_PATH <- "data/AB604/AB604.shp" 
+vote_data <- read_csv(VOTE_DATA_PATH) %>%
+    rename(SR_Precinct_ID = SRPREC, DEM_Votes_Raw = CNGDEM01, REP_Votes_Raw = CNGREP01) %>%
+    mutate(DEM_Votes = parse_number(as.character(DEM_Votes_Raw)),REP_Votes = parse_number(as.character(REP_Votes_Raw))) %>%
+    select(SR_Precinct_ID, DEM_Votes, REP_Votes)
+
+sr_precincts_sf <- st_read(SR_SHAPEFILE_PATH) %>%
+    rename(SR_Precinct_ID = SRPREC)%>%
+    select(SR_Precinct_ID, geometry)
+ab604_districts_sf <- st_read(AB604_SHAPEFILE_PATH)%>%
+    rename(New_District_ID = DISTRICT)%>%
+    select(New_District_ID, geometry)
+sr_precincts_votes_sf <- sr_precincts_sf %>%
+    inner_join(vote_data, by = "SR_Precinct_ID")
+sr_precincts_transformed <- sr_precincts_votes_sf %>%
+  st_transform(crs = 3310) %>%
+  mutate(geometry = st_make_valid(geometry)) %>%
+  mutate(Original_Area = st_area(.))
+
+ab604_transformed <- ab604_districts_sf %>%
+  st_transform(crs = 3310) %>%
+  mutate(geometry = st_make_valid(geometry))
+
+weighted_votes_sf <- st_intersection(sr_precincts_transformed, ab604_transformed) %>%
+  st_collection_extract("POLYGON") %>%
+  mutate(Overlap_Area = st_area(.),Original_Area_Numeric = as.numeric(Original_Area),Overlap_Area_Numeric = as.numeric(Overlap_Area),Area_Weight = Overlap_Area_Numeric / Original_Area_Numeric,Allocated_DEM_Votes = DEM_Votes * Area_Weight,Allocated_REP_Votes = REP_Votes * Area_Weight) %>%
+  select(New_District_ID, Allocated_DEM_Votes, Allocated_REP_Votes)
+
+final_results <- weighted_votes_sf %>%
+  st_drop_geometry() %>%
+  group_by(New_District_ID) %>%
+  summarise(Total_Allocated_DEM_Votes = sum(Allocated_DEM_Votes, na.rm = TRUE),Total_Allocated_REP_Votes = sum(Allocated_REP_Votes, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(Total_Votes = Total_Allocated_DEM_Votes + Total_Allocated_REP_Votes,DEM_Vote_Share = Total_Allocated_DEM_Votes / Total_Votes, Winner = if_else(DEM_Vote_Share > 0.5, "DEM", "REP")
+  ) %>%
+  arrange(New_District_ID)
+print(final_results)
+```

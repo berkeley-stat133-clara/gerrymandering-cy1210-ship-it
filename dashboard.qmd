@@ -1,0 +1,138 @@
+---
+title: California Congressional Gerrymandering Analysis
+author: Dory Yang
+format: 
+  dashboard:
+    orientation: rows
+    theme: yeti
+server: shiny
+
+---
+# Executive Summary {.sidebar}
+### Research Question
+
+"Will the adoption of the new district map (AB 604) lead to an increase in partisan advantage relative to the 2024 Actual Map? If so, by how much?"
+
+### Methodology Overview
+
+The 2024 Congressional General Election results were interpolated onto the proposed AB 604 district boundaries using Area-Weighted Interpolation (Approach A).
+Key metrics— Efficiency Gap (EG) and Mean–Median Difference (MM) —were calculated for both the actual and hypothetical maps to enable a direct comparison of partisan advantage.
+
+#  Project Data Setup
+## Initial Data & Metric Calculation
+```{r}
+#| label: data-setup
+library(tidyverse)
+library(sf)
+library(leaflet)
+EG_old <- 0.045
+MM_old <- 0.021
+Seats_DEM_old <- 5
+Seats_REP_old <- 5
+EG_new <- -0.2820
+MM_new <- -0.0011
+Seats_DEM_new <- 9
+Seats_REP_new <- 1
+
+Metric <- c("Seats Won (DEM)", "Efficiency Gap (EG)", "Mean-Median Diff (MM)")
+Old_Map <- c(Seats_DEM_old, EG_old, MM_old)
+New_Map <- c(Seats_DEM_new, EG_new, MM_new)
+Change <- New_Map - Old_Map
+
+comparison_data <- data.frame(
+  Metric = Metric,
+  `2024 Actual Map (Old)` = Old_Map,
+  `2025 AB 604 Map (New)` = New_Map,
+  Change = Change
+)
+
+if (!exists("final_results")) {
+  final_results <- data.frame(
+    New_District_ID = c("01", "02", "03", "04", "05", "06", "07", "08", "09", "10"),
+    Total_Allocated_DEM_Votes = c(244923, 254434, 199449, 214025, 233157, 177364, 189037, 214908, 151258, 245113),
+    Total_Allocated_REP_Votes = c(216476, 174137, 186079, 163544, 306518, 154599, 143874, 102422, 107600, 126260),
+    Total_Votes = c(461399, 428571, 385528, 377570, 539675, 331962, 332911, 317330, 258858, 371373),
+    DEM_Vote_Share = c(0.531, 0.594, 0.517, 0.567, 0.432, 0.534, 0.568, 0.677, 0.584, 0.660),
+    Winner = c("DEM", "DEM", "DEM", "DEM", "REP", "DEM", "DEM", "DEM", "DEM", "DEM")
+  )
+}
+```
+
+## AB 604 District Map
+
+```{r seat-plot}
+#| label: setup-plot
+#| fig-width: 7
+#| fig-height: 5
+seat_comparison <- data.frame(Map = c("2024 Actual", "2025 AB 604"),Seats = c(Seats_DEM_old, Seats_DEM_new))
+seat_chart <- ggplot(seat_comparison, aes(x = Map, y = Seats, fill = Map)) + geom_bar(stat = "identity") + geom_text(aes(label = Seats), vjust = -0.5) +labs(title = "Democratic Seats Won: Old vs. New Map", y = "Number of Seats") +
+    theme_minimal() 
+seat_chart
+
+```
+
+
+# Comparison Table
+
+```{r}
+#| label: metric-table
+comparison_data
+```
+
+# Policy Interpretation
+
+```{r}
+#| label: policy-interpretation
+EG_diff <- EG_new - EG_old
+MM_diff <- MM_new - MM_old
+
+EG_text <- if (EG_diff < 0) {
+  paste0("The Efficiency Gap (EG) strongly favors the DEM Party, shifting from ", round(EG_old*100, 1), "% to ", round(EG_new*100, 1), "%.")
+} else if (EG_diff > 0.01) {
+  paste0("The Efficiency Gap (EG) favors the REP Party, shifting from ", round(EG_old*100, 1), "% to ", round(EG_new*100, 1), "%.")
+} else {
+  "The Efficiency Gap change is minimal, suggesting no significant partisan bias shift."
+}
+
+MM_text <- if (abs(MM_new) < abs(MM_old) * 0.5) {
+  "The Mean-Median Difference indicates a more uniform vote distribution in the new map, minimizing wasted votes."
+} else {
+  "The Mean-Median Difference indicates a similar level of vote clustering across both maps."
+}
+
+print(EG_text)
+print(MM_text)
+```
+
+# Hypothetical AB 604 (Part 5)
+
+## Row (Seat Summary)
+
+```{r}
+#| label: seat-summary
+print(paste0("DEM Seats Won: ", Seats_DEM_new))
+print(paste0("REP Seats Won: ", Seats_REP_new))
+```
+
+## Column (Seat Allocation)
+```{r}
+#| label: final-results-table
+final_results %>%
+  mutate(
+    DEM_Share = paste0(round(DEM_Vote_Share * 100, 2), "%")
+  ) %>%
+  select(-DEM_Vote_Share) %>%
+  rename(
+    District_ID = New_District_ID,
+    DEM_Votes = Total_Allocated_DEM_Votes,
+    REP_Votes = Total_Allocated_REP_Votes,
+    Total_Votes = Total_Votes,
+    Winner = Winner
+  )
+```
+
+## Map Comparison
+
+### Row
+
+#### Column

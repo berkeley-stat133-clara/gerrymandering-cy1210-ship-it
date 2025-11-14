@@ -1,0 +1,50 @@
+---
+title: Exploratory Data Analysis
+format: typst
+---
+
+### Question 1
+
+Which county had the most total votes?
+
+### Answer 1
+
+```{r}
+result <- a_clean |> 
+  mutate(votes1 = as.numeric(`...2`),votes2 = as.numeric(`...3`),total_votes = votes1 + votes2) |>
+  arrange(desc(total_votes))
+print(result)
+```
+
+SD had the most total votes. 
+### Question 2
+
+Which congressional district had the closest race?
+
+### Answer 2
+
+```{r}
+closest_real <- a_clean |>
+  mutate(votes1 = as.numeric(`...2`),votes2 = as.numeric(`...3`),diff = abs(votes1 - votes2)) |>
+  filter(votes1 > 0 | votes2 > 0) |>    
+  arrange(diff) |>
+  slice(1)
+closest_real
+```
+
+Solano had the smallest vote difference.
+### Question 3
+
+Which races were the biggest blowouts? 
+
+### Answer 3
+```{r}
+max_blowouts <- a_clean |>
+  mutate(votes1 = as.numeric(`...2`),votes2 = as.numeric(`...3`),diff = abs(votes1 - votes2)) |>
+  filter(votes1 > 0 | votes2 > 0) |>
+  arrange(desc(diff)) |>
+  slice(1)
+max_blowouts
+```
+
+San Francisco had the most lopsided race with a vote difference of 210,481.
