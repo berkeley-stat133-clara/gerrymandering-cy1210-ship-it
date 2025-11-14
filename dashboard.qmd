@@ -11,6 +11,8 @@ server: shiny
 # Executive Summary {.sidebar}
 ### Research Question
 
+hi
+
 "Will the adoption of the new district map (AB 604) lead to an increase in partisan advantage relative to the 2024 Actual Map? If so, by how much?"
 
 ### Methodology Overview
