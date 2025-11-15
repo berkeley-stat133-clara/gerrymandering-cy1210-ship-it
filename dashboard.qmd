@@ -6,27 +6,28 @@ format:
     orientation: rows
     theme: yeti
 server: shiny
-
 ---
-# Executive Summary {.sidebar}
-### Research Question
 
-hi
+# Executive Summary {.sidebar}
+
+### Research Question
 
 "Will the adoption of the new district map (AB 604) lead to an increase in partisan advantage relative to the 2024 Actual Map? If so, by how much?"
 
 ### Methodology Overview
 
-The 2024 Congressional General Election results were interpolated onto the proposed AB 604 district boundaries using Area-Weighted Interpolation (Approach A).
-Key metrics— Efficiency Gap (EG) and Mean–Median Difference (MM) —were calculated for both the actual and hypothetical maps to enable a direct comparison of partisan advantage.
+The 2024 Congressional General Election results were interpolated onto the proposed AB 604 district boundaries using Area-Weighted Interpolation (Approach A). Key metrics— Efficiency Gap (EG) and Mean–Median Difference (MM) —were calculated for both the actual and hypothetical maps to enable a direct comparison of partisan advantage.
 
-#  Project Data Setup
+# Project Data Setup
+
 ## Initial Data & Metric Calculation
+
 ```{r}
 #| label: data-setup
 library(tidyverse)
 library(sf)
 library(leaflet)
+library(dplyr)
 EG_old <- 0.045
 MM_old <- 0.021
 Seats_DEM_old <- 5
@@ -60,7 +61,7 @@ if (!exists("final_results")) {
 }
 ```
 
-## AB 604 District Map
+## Number of seats Map
 
 ```{r seat-plot}
 #| label: setup-plot
@@ -73,6 +74,33 @@ seat_chart
 
 ```
 
+## Map
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(sf)
+
+ab604_districts_sf <- st_read("data/AB604/AB604.shp") %>%
+  rename(New_District_ID = DISTRICT) %>%   
+  st_transform(3310) %>%
+  st_make_valid()
+
+ab604_final_map <- ab604_districts_sf %>%
+  left_join(final_results_sf, by = "New_District_ID")
+
+a<-ggplot(ab604_final_map) +
+  geom_sf(aes(fill = DEM_Vote_Share), color = "black", linewidth = 0.2) +
+  scale_fill_gradient2(low = "red", mid = "white", high = "blue", midpoint = 0.5, limits = c(0.3, 0.7), name = "Democratic Vote Share") + #creates a diverging color scale centered on a specified midpoint
+  labs(title = "New Districts Map") +
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.grid.major = element_line(colour = 'transparent')
+  )
+a
+```
 
 # Comparison Table
 
@@ -117,6 +145,7 @@ print(paste0("REP Seats Won: ", Seats_REP_new))
 ```
 
 ## Column (Seat Allocation)
+
 ```{r}
 #| label: final-results-table
 final_results %>%
